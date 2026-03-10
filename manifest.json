@@ -1,0 +1,22 @@
+{
+  "name": "ATC E-Paper Control",
+  "short_name": "ATCPaper",
+  "description": "BLE Control for TLSR E-Paper Displays",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#2c3e50",
+  "theme_color": "#2c3e50",
+  "icons": [
+    {
+      "src": "data:image/svg+xml;base64,...(PASTE_THE_192x192_BASE64_HERE)...",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "data:image/svg+xml;base64,...(PASTE_THE_512x512_BASE64_HERE)...",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+    
+  ]
+}
