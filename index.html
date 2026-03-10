@@ -3,141 +3,132 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ATC Retro Pager</title>
+    <title>80s Retro Pager</title>
     <link rel="manifest" href="manifest.json">
     <style>
-        :root { --primary: #3498db; --secondary: #2ecc71; --pager-bg: #1a1a1a; --lcd: #9ead86; }
-        body { font-family: 'Courier New', monospace; background: #2c3e50; margin: 0; padding: 15px; color: white; }
-        .pager-case { background: var(--pager-bg); border-radius: 20px; padding: 20px; border: 4px solid #333; box-shadow: 0 10px 0 #000; max-width: 400px; margin: auto; }
-        .lcd-screen { background: var(--lcd); color: #222; padding: 15px; border-radius: 5px; border: 4px inset #777; min-height: 80px; margin-bottom: 20px; font-weight: bold; font-size: 1.2rem; text-transform: uppercase; }
+        :root { --case: #222; --lcd: #879771; --btn: #444; }
+        body { background: #34495e; font-family: 'Courier New', monospace; display: flex; justify-content: center; padding: 20px; }
+        
+        /* The Pager Body */
+        .pager { 
+            background: var(--case); width: 320px; padding: 25px; border-radius: 15px;
+            box-shadow: 0 10px 0 #111, 0 20px 20px rgba(0,0,0,0.5); border: 2px solid #444;
+        }
+        
+        /* The LCD Screen */
+        .screen-container { background: #000; padding: 10px; border-radius: 5px; margin-bottom: 20px; border: 3px inset #555; }
+        .lcd { 
+            background: var(--lcd); color: #2a3321; height: 100px; padding: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.4rem; font-weight: bold; text-align: center;
+            text-transform: uppercase; line-height: 1.2; box-shadow: inset 2px 2px 5px rgba(0,0,0,0.3);
+        }
+
+        input { width: 100%; padding: 12px; border: none; border-radius: 5px; margin-bottom: 10px; box-sizing: border-box; font-family: 'Courier New'; font-weight: bold; }
         
         button { 
-            width: 100%; padding: 15px; margin: 5px 0; border: none; border-radius: 50px; 
-            font-weight: bold; cursor: pointer; background: #444; color: white; box-shadow: 0 4px 0 #222;
+            width: 100%; padding: 15px; border: none; border-radius: 50px; color: white;
+            font-weight: bold; cursor: pointer; margin-bottom: 10px;
+            box-shadow: 0 4px 0 #111; transition: 0.1s;
         }
-        button:active { transform: translateY(2px); box-shadow: 0 2px 0 #222; }
-        .btn-connect { background: var(--primary); }
-        .btn-send { background: var(--secondary); color: #111; }
+        button:active { transform: translateY(3px); box-shadow: 0 1px 0 #111; }
         
-        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 5px; border: none; font-size: 1rem; }
-        #status { font-size: 0.7rem; color: #888; text-align: center; margin-top: 10px; }
-        #log { font-size: 0.6rem; color: #666; height: 40px; overflow: hidden; margin-top: 10px; }
-        canvas { display: none; } /* Hidden canvas for text processing */
+        .btn-blue { background: #2980b9; }
+        .btn-green { background: #27ae60; }
+
+        #log { color: #888; font-size: 0.7rem; text-align: center; margin-top: 10px; }
+        canvas { display: none; } /* Hidden canvas used as the engine */
     </style>
 </head>
 <body>
 
-    <div class="pager-case">
-        <div class="lcd-screen" id="display-preview">READY...</div>
+    <div class="pager">
+        <div class="screen-container">
+            <div class="lcd" id="preview">READY...</div>
+        </div>
+
+        <button class="btn-blue" id="connBtn" onclick="connect()">CONNECT PAGER</button>
         
-        <button id="connectbutton" class="btn-connect" onclick="preConnect();">POWER ON / CONNECT</button>
+        <input type="text" id="msgInput" placeholder="ENTER MESSAGE..." maxlength="25" oninput="updatePreview()">
         
-        <input type="text" id="pagerMsg" placeholder="ENTER MESSAGE..." maxlength="20" oninput="updatePreview()">
-        <button class="btn-send" onclick="sendPagerText();">📟 SEND PAGE</button>
+        <button class="btn-green" onclick="generateAndSend()">📟 SEND PAGE</button>
         
-        <div id="status">OFFLINE</div>
-        <div id="log"></div>
+        <div id="log">STATUS: STANDBY</div>
     </div>
 
-    <canvas id="textCanvas" width="250" height="122"></canvas>
+    <canvas id="engine" width="296" height="128"></canvas>
 
     <script>
-        // --- ORIGINAL BLE LOGIC ---
-        let bleDevice, gattServer, Theservice, writeCharacteristic;
-        let imgArray = "", startTime = 0, uploadPart = 0;
+        let writeChar;
+        const SERVICE_UUID = '13187b10-eba9-a3ba-044e-83d3217d9a38';
+        const CHAR_UUID = '4b646063-6264-f3a7-8941-e65356ea82fe';
 
         function updatePreview() {
-            document.getElementById('display-preview').innerText = document.getElementById('pagerMsg').value || "READY...";
+            document.getElementById('preview').innerText = document.getElementById('msgInput').value || "READY...";
         }
 
-        // DRAW TEXT TO BITMAP
-        function sendPagerText() {
-            const canvas = document.getElementById('textCanvas');
-            const ctx = canvas.getContext('2d');
-            const text = document.getElementById('pagerMsg').value;
+        function addLog(msg) { document.getElementById('log').innerText = msg; }
 
-            // 1. Clear & Draw
-            ctx.fillStyle = "white"; // "White" is the background for E-paper
+        async function connect() {
+            try {
+                const device = await navigator.bluetooth.requestDevice({
+                    filters: [{ namePrefix: 'ATC' }],
+                    optionalServices: [SERVICE_UUID]
+                });
+                addLog("Connecting...");
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                writeChar = await service.getCharacteristic(CHAR_UUID);
+                addLog("PAGER ONLINE");
+                document.getElementById('connBtn').innerText = "ONLINE";
+            } catch (e) { addLog("Error: " + e.message); }
+        }
+
+        async function generateAndSend() {
+            if (!writeChar) return addLog("CONNECT FIRST!");
+            
+            const canvas = document.getElementById('engine');
+            const ctx = canvas.getContext('2d');
+            const text = document.getElementById('msgInput').value;
+
+            // 1. Draw Text to Canvas
+            ctx.fillStyle = "white";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = "black";
-            ctx.font = "bold 30px Arial";
+            ctx.font = "bold 35px Arial";
             ctx.textAlign = "center";
             ctx.fillText(text, canvas.width/2, canvas.height/2 + 10);
 
-            // 2. Convert to Hex Bitmap (Specific for ATC_TLSR_Paper)
-            let hexData = canvasToHex(ctx, canvas.width, canvas.height);
-            sendimg(hexData);
-        }
-
-        function canvasToHex(ctx, width, height) {
-            let hex = "";
-            for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x += 8) {
-                    let byte = 0;
-                    for (let bit = 0; bit < 8; bit++) {
-                        let imgData = ctx.getImageData(x + bit, y, 1, 1).data;
-                        // If pixel is dark, set bit to 0 (for e-paper)
-                        if (imgData[0] < 128) byte |= (1 << (7 - bit));
-                    }
-                    hex += byte.toString(16).padStart(2, '0');
+            // 2. Convert Canvas to E-Paper Hex format
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+            let hexString = "";
+            
+            for (let i = 0; i < imgData.length; i += 4 * 8) {
+                let byte = 0;
+                for (let bit = 0; bit < 8; bit++) {
+                    const r = imgData[(i + bit * 4)];
+                    if (r < 128) byte |= (1 << (7 - bit));
                 }
+                hexString += byte.toString(16).padStart(2, '0');
             }
-            return hex;
-        }
 
-        // --- BLE CORE (SAME AS BEFORE) ---
-        function sendimg(cmdIMG) {
-            startTime = new Date().getTime();
-            imgArray = cmdIMG;
-            uploadPart = 0;
-            addLog('Sending Page...');
-            sendCommand(hexToBytes("0000")).then(() => {
-                sendCommand(hexToBytes("020000")).then(() => sendIMGpart());
-            }).catch(handleError);
-        }
+            // 3. Send via BLE
+            addLog("Sending Page...");
+            await writeChar.writeValue(new Uint8Array([0x00, 0x00])); // Reset
+            await writeChar.writeValue(new Uint8Array([0x02, 0x00, 0x00])); // Prep
 
-        function sendIMGpart() {
-            if (imgArray.length > 0) {
-                let currentpart = "03" + imgArray.substring(0, 480);
-                imgArray = imgArray.substring(480);
-                setStatus('SENDING: ' + (uploadPart++) + "%");
-                sendCommand(hexToBytes(currentpart)).then(() => sendIMGpart()).catch(handleError);
-            } else {
-                sendCommand(hexToBytes("01")).then(() => {
-                    setStatus("PAGE SENT!");
-                    addLog("Done.");
-                });
+            const step = 480;
+            for (let i = 0; i < hexString.length; i += step) {
+                let part = "03" + hexString.substring(i, i + step);
+                let bytes = [];
+                for (let c = 0; c < part.length; c += 2) bytes.push(parseInt(part.substr(c, 2), 16));
+                await writeChar.writeValue(new Uint8Array(bytes));
+                addLog("Transmitting... " + Math.round((i/hexString.length)*100) + "%");
             }
-        }
 
-        function preConnect() {
-            navigator.bluetooth.requestDevice({ 
-                optionalServices: ['13187b10-eba9-a3ba-044e-83d3217d9a38'], 
-                acceptAllDevices: true 
-            }).then(device => {
-                bleDevice = device;
-                addLog("Connecting...");
-                return device.gatt.connect();
-            }).then(server => {
-                return server.getPrimaryService('13187b10-eba9-a3ba-044e-83d3217d9a38');
-            }).then(service => {
-                return service.getCharacteristic('4b646063-6264-f3a7-8941-e65356ea82fe');
-            }).then(characteristic => {
-                writeCharacteristic = characteristic;
-                document.getElementById("connectbutton").innerHTML = "PAGER ONLINE";
-                setStatus("CONNECTED");
-            }).catch(err => addLog(err));
+            await writeChar.writeValue(new Uint8Array([0x01])); // Refresh
+            addLog("PAGE DELIVERED");
         }
-
-        async function sendCommand(cmd) { if (writeCharacteristic) await writeCharacteristic.writeValue(cmd); }
-        function setStatus(txt) { document.getElementById("status").innerHTML = txt; }
-        function addLog(txt) { document.getElementById("log").innerHTML = txt; }
-        function hexToBytes(hex) {
-            let bytes = [];
-            for (let c = 0; c < hex.length; c += 2) bytes.push(parseInt(hex.substr(c, 2), 16));
-            return new Uint8Array(bytes);
-        }
-        function handleError(e) { console.log(e); setStatus("ERROR"); }
     </script>
 </body>
 </html>
