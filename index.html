@@ -20,7 +20,7 @@
 </head>
 <body>
 
-    <h2>📟 S24 BLE PAGER 2</h2>
+    <h2>📟 S24 BLE PAGER 3</h2>
     
     <canvas id="canvas" width="296" height="128"></canvas>
     
@@ -43,18 +43,56 @@
         }
 
         function drawText() {
-            const c = document.getElementById('canvas');
-            const ctx = c.getContext('2d');
-            const val = document.getElementById('msgInput').value || "S24 ONLINE";
-            
-            ctx.fillStyle = "white";
-            ctx.fillRect(0, 0, c.width, c.height);
-            
-            ctx.fillStyle = "black";
-            ctx.font = "bold 38px Arial";
-            ctx.textAlign = "center";
-            ctx.fillText(val, c.width/2, c.height/2 + 14);
+    const c = document.getElementById('canvas');
+    const ctx = c.getContext('2d');
+    const input = document.getElementById('msgInput').value || "S24 ONLINE";
+    
+    // 1. Clear Canvas
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, c.width, c.height);
+    
+    // 2. Text Settings
+    const fontSize = 32; // Slightly smaller to fit more
+    ctx.fillStyle = "black";
+    ctx.font = `bold ${fontSize}px Arial`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    // 3. Multi-line Logic
+    const maxWidth = c.width - 20; // Margin
+    const lineHeight = fontSize + 5;
+    const words = input.split(' ');
+    let lines = [];
+    let currentLine = "";
+
+    // Handle manual line breaks and auto-wrapping
+    const inputLines = input.split('\n');
+    
+    inputLines.forEach(line => {
+        let lineWords = line.split(' ');
+        let tempLine = "";
+        
+        for (let n = 0; n < lineWords.length; n++) {
+            let testLine = tempLine + lineWords[n] + " ";
+            let metrics = ctx.measureText(testLine);
+            if (metrics.width > maxWidth && n > 0) {
+                lines.push(tempLine);
+                tempLine = lineWords[n] + " ";
+            } else {
+                tempLine = testLine;
+            }
         }
+        lines.push(tempLine);
+    });
+
+    // 4. Draw Centered
+    const totalHeight = lines.length * lineHeight;
+    let startY = (c.height - totalHeight) / 2 + (lineHeight / 2);
+
+    lines.forEach((line, i) => {
+        ctx.fillText(line.trim(), c.width / 2, startY + (i * lineHeight));
+    });
+}
 
         async function preConnect() {
             try {
@@ -127,4 +165,5 @@
     </script>
 </body>
 </html>
+
 
