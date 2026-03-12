@@ -2,96 +2,41 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>S24 Pager Dashboard</title>
+    <title>S24 Pager Control</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    
     <script src="dithering.js"></script>
     <script src="utils.js"></script>
-
     <style>
-        body { 
-            font-family: 'Segoe UI', Roboto, sans-serif; 
-            background: #1a1a1b; 
-            color: #e0e0e0; 
-            text-align: center; 
-            padding: 20px; 
-            margin: 0;
-        }
-        h2 { color: #00d4ff; margin-bottom: 20px; font-weight: 300; }
+        body { font-family: 'Segoe UI', sans-serif; background: #1a1a1b; color: #e0e0e0; text-align: center; padding: 20px; margin: 0; }
+        h2 { color: #00d4ff; font-weight: 300; margin-bottom: 20px; }
         
-        canvas { 
-            background: white; 
-            border: 4px solid #333; 
-            border-radius: 8px; 
-            margin-bottom: 20px; 
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            max-width: 100%;
-            height: auto;
-            image-rendering: pixelated;
-        }
+        /* Container for Canvas & Settings */
+        .preview-box { position: relative; display: inline-block; width: 100%; max-width: 296px; }
+        canvas { background: white; border: 4px solid #333; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 100%; height: auto; image-rendering: pixelated; }
+        
+        /* Settings Gear */
+        .settings-btn { position: absolute; top: -10px; right: -10px; background: #333; border: 1px solid #444; border-radius: 50%; width: 35px; height: 35px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #aaa; z-index: 10; }
+        .settings-btn:hover { color: #fff; background: #444; }
 
-        /* Progress Bar Styles */
-        #progressContainer {
-            width: 90%;
-            max-width: 430px;
-            background: #333;
-            height: 12px;
-            border-radius: 6px;
-            margin: 10px auto;
-            overflow: hidden;
-            display: none; /* Hidden until upload starts */
-        }
-        #progressBar {
-            width: 0%;
-            height: 100%;
-            background: #00d4ff;
-            transition: width 0.2s;
-        }
+        #progressContainer { width: 90%; max-width: 400px; background: #333; height: 8px; border-radius: 4px; margin: 15px auto; overflow: hidden; display: none; }
+        #progressBar { width: 0%; height: 100%; background: #00d4ff; transition: width 0.2s; }
 
-        textarea { 
-            width: 90%; 
-            max-width: 400px;
-            height: 100px;
-            padding: 15px; 
-            font-size: 1.1rem; 
-            border-radius: 12px; 
-            border: 1px solid #333; 
-            background: #2d2d2e; 
-            color: white; 
-            margin-bottom: 10px;
-            outline: none;
-            resize: none;
-        }
+        textarea { width: 90%; max-width: 400px; height: 100px; padding: 15px; font-size: 1.1rem; border-radius: 12px; border: 1px solid #333; background: #2d2d2e; color: white; margin-top: 10px; outline: none; resize: none; }
 
-        button { 
-            width: 90%; 
-            max-width: 430px;
-            padding: 16px; 
-            margin: 8px 0; 
-            font-weight: bold; 
-            border-radius: 12px; 
-            border: none; 
-            cursor: pointer; 
-            transition: all 0.2s;
-        }
-
-        .btn-conn { background: #3c3c3e; color: #00d4ff; border: 1px solid #444; }
-        .btn-send { background: #007bff; color: white; font-size: 1.2rem; }
-        button:active { transform: scale(0.98); }
-
-        #log { 
-            background: #000; color: #00ff00; font-family: monospace; 
-            font-size: 11px; padding: 15px; text-align: left; 
-            height: 100px; overflow-y: auto; border-radius: 8px; 
-            margin: 20px auto; max-width: 400px; border: 1px solid #333;
-        }
+        .main-btn { width: 90%; max-width: 430px; padding: 18px; margin: 15px 0; font-weight: bold; border-radius: 12px; border: none; cursor: pointer; font-size: 1.2rem; transition: 0.3s; background: #007bff; color: white; box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3); }
+        .main-btn.online { background: #28a745; box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3); }
+        
+        #log { background: #000; color: #00ff00; font-family: monospace; font-size: 11px; padding: 15px; text-align: left; height: 80px; overflow-y: auto; border-radius: 8px; margin: 10px auto; max-width: 400px; border: 1px solid #333; }
     </style>
 </head>
 <body>
 
-    <h2>📟 S24 PAGER SYSTEM 4</h2>
+    <h2>📟 S24 PAGER</h2>
     
-    <canvas id="canvas" width="296" height="128"></canvas>
+    <div class="preview-box">
+        <div class="settings-btn" onclick="disconnectDevice()" title="Change Device">⚙️</div>
+        <canvas id="canvas" width="296" height="128"></canvas>
+    </div>
     
     <div id="progressContainer">
         <div id="progressBar"></div>
@@ -99,10 +44,9 @@
     
     <textarea id="msgInput" placeholder="Enter message..." oninput="drawText()"></textarea>
     
-    <button class="btn-conn" id="connBtn" onclick="preConnect()">1. CONNECT TO S24</button>
-    <button class="btn-send" onclick="upload_image()">2. PUSH TO DISPLAY</button>
+    <button class="main-btn" id="actionBtn" onclick="handleAction()">CONNECT PAGER</button>
 
-    <div id="log">System: Ready...</div>
+    <div id="log">System: Ready</div>
 
     <script>
         let bleDevice, gattServer, epdService, epdCharacteristic;
@@ -115,37 +59,73 @@
             l.scrollTop = l.scrollHeight;
         }
 
-        function updateProgress(percent) {
-            const bar = document.getElementById('progressBar');
-            document.getElementById('progressContainer').style.display = 'block';
-            bar.style.width = percent + '%';
+        async function handleAction() {
+            if (!bleDevice || !bleDevice.gatt.connected) {
+                await connectPager();
+            } else {
+                await upload_image();
+            }
+        }
+
+        async function connectPager() {
+            try {
+                addLog("Searching for S24 Devices...");
+                bleDevice = await navigator.bluetooth.requestDevice({
+                    filters: [{ namePrefix: 'S24_' }],
+                    optionalServices: [SERVICE_UUID]
+                });
+
+                addLog("Connecting to " + bleDevice.name);
+                gattServer = await bleDevice.gatt.connect();
+                epdService = await gattServer.getPrimaryService(SERVICE_UUID);
+                epdCharacteristic = await epdService.getCharacteristic(CHAR_UUID);
+                
+                // Update Button UI
+                const btn = document.getElementById('actionBtn');
+                btn.innerText = "SEND TO PAGER";
+                btn.classList.add('online');
+                addLog("Pager Online.");
+
+                bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+            } catch (e) {
+                addLog("Error: " + e.message);
+            }
+        }
+
+        function onDisconnected() {
+            const btn = document.getElementById('actionBtn');
+            btn.innerText = "RECONNECT PAGER";
+            btn.classList.remove('online');
+            addLog("Device Disconnected.");
+        }
+
+        async function disconnectDevice() {
+            if (bleDevice && bleDevice.gatt.connected) {
+                await bleDevice.gatt.disconnect();
+            }
+            addLog("Connection Reset. You can pick a new device.");
+            await connectPager();
         }
 
         function drawText() {
             const c = document.getElementById('canvas');
             const ctx = c.getContext('2d');
             const input = document.getElementById('msgInput').value || "S24 PAGER READY";
-            
             ctx.fillStyle = "white";
             ctx.fillRect(0, 0, c.width, c.height);
             
             // Envelope Icon
             const iconX = c.width - 35, iconY = 12;
-            ctx.strokeStyle = "black";
-            ctx.lineWidth = 2;
+            ctx.strokeStyle = "black"; ctx.lineWidth = 2;
             ctx.strokeRect(iconX, iconY, 22, 14); 
-            ctx.beginPath();
-            ctx.moveTo(iconX, iconY); ctx.lineTo(iconX + 11, iconY + 7); ctx.lineTo(iconX + 22, iconY);
-            ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(iconX, iconY); ctx.lineTo(iconX + 11, iconY + 7); ctx.lineTo(iconX + 22, iconY); ctx.stroke();
 
-            // Text Setup
+            // Text
             const fontSize = 26, xOffset = 10;
             ctx.fillStyle = "black";
             ctx.font = `bold ${fontSize}px Arial`;
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
+            ctx.textAlign = "center"; ctx.textBaseline = "middle";
 
-            // Multi-line Wrap
             const maxWidth = c.width - 50, lineHeight = fontSize + 4;
             const inputLines = input.split('\n');
             let lines = [];
@@ -163,63 +143,39 @@
 
             const totalHeight = lines.length * lineHeight;
             let startY = (c.height - totalHeight) / 2 + (lineHeight / 2);
-
             lines.forEach((line, i) => {
                 ctx.fillText(line.trim(), (c.width / 2) + xOffset, startY + (i * lineHeight));
             });
         }
 
-        async function preConnect() {
-            try {
-                addLog("Searching...");
-                bleDevice = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    optionalServices: [SERVICE_UUID]
-                });
-                gattServer = await bleDevice.gatt.connect();
-                epdService = await gattServer.getPrimaryService(SERVICE_UUID);
-                epdCharacteristic = await epdService.getCharacteristic(CHAR_UUID);
-                document.getElementById('connBtn').innerText = "CONNECTED: " + (bleDevice.name || "S24");
-                addLog("Connected.");
-            } catch (e) { addLog("Error: " + e.message); }
-        }
-
-        async function sendCommand(cmd) {
-            if (epdCharacteristic) await epdCharacteristic.writeValueWithResponse(hexToBytes(cmd));
-        }
-
         async function upload_image() {
-            if (!epdCharacteristic) return addLog("Connect first!");
             const canvas = document.getElementById('canvas');
-            updateProgress(0);
+            const bar = document.getElementById('progressBar');
+            document.getElementById('progressContainer').style.display = 'block';
             
             try {
-                addLog("Waking tag...");
-                await sendCommand("0000"); 
-                await sendCommand("020000"); 
+                addLog("Uploading...");
+                await epdCharacteristic.writeValueWithResponse(hexToBytes("0000")); 
+                await epdCharacteristic.writeValueWithResponse(hexToBytes("020000")); 
 
-                addLog("Sending Data...");
                 const bwData = bytesToHex(canvas2bytes(canvas));
-                await sendBufferData(bwData, 'bw', 0); // 0-50%
+                await sendChunked(bwData, 'ff', 0);
                 
                 const redData = bytesToHex(canvas2bytes(canvas, 'bwr'));
-                await sendBufferData(redData, 'bwr', 50); // 50-100%
+                await sendChunked(redData, '00', 50);
 
-                addLog("Refreshing...");
-                await sendCommand("0101");
-                updateProgress(100);
+                await epdCharacteristic.writeValueWithResponse(hexToBytes("0101"));
+                addLog("Update Complete.");
                 setTimeout(() => { document.getElementById('progressContainer').style.display = 'none'; }, 2000);
-                addLog("Done.");
             } catch (e) { addLog("Failed: " + e.message); }
         }
 
-        async function sendBufferData(value, type, basePercent) {
-            let code = (type === 'bwr') ? '00' : 'ff';
+        async function sendChunked(value, code, base) {
             const step = 480;
             for (let i = 0; i < value.length; i += step) {
-                await sendCommand("03" + code + intToHex(i / 2, 2) + value.substring(i, i + step));
-                let progress = basePercent + ((i / value.length) * 50);
-                updateProgress(progress);
+                let cmd = "03" + code + intToHex(i / 2, 2) + value.substring(i, i + step);
+                await epdCharacteristic.writeValueWithResponse(hexToBytes(cmd));
+                document.getElementById('progressBar').style.width = (base + ((i / value.length) * 50)) + '%';
             }
         }
 
