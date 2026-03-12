@@ -41,103 +41,93 @@
 
     <canvas id="textCanvas" width="250" height="122"></canvas>
 
-    <script>
-        // --- ORIGINAL BLE LOGIC ---
-        let bleDevice, gattServer, Theservice, writeCharacteristic;
-        let imgArray = "", startTime = 0, uploadPart = 0;
+<script>
+        let writeChar;
+        const SERVICE_UUID = '13187b10-eba9-a3ba-044e-83d3217d9a38';
+        const CHAR_UUID = '4b646063-6264-f3a7-8941-e65356ea82fe';
 
         function updatePreview() {
-            document.getElementById('display-preview').innerText = document.getElementById('pagerMsg').value || "READY...";
+            document.getElementById('preview').innerText = document.getElementById('msgInput').value || "READY...";
         }
 
-        // DRAW TEXT TO BITMAP
-        function sendPagerText() {
-            const canvas = document.getElementById('textCanvas');
-            const ctx = canvas.getContext('2d');
-            const text = document.getElementById('pagerMsg').value;
+        function addLog(msg) { document.getElementById('log').innerText = msg; }
 
-            // 1. Clear & Draw
-            ctx.fillStyle = "white"; // "White" is the background for E-paper
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = "black";
-            ctx.font = "bold 30px Arial";
-            ctx.textAlign = "center";
-            ctx.fillText(text, canvas.width/2, canvas.height/2 + 10);
-
-            // 2. Convert to Hex Bitmap (Specific for ATC_TLSR_Paper)
-            let hexData = canvasToHex(ctx, canvas.width, canvas.height);
-            sendimg(hexData);
-        }
-
-        function canvasToHex(ctx, width, height) {
-            let hex = "";
-            for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x += 8) {
-                    let byte = 0;
-                    for (let bit = 0; bit < 8; bit++) {
-                        let imgData = ctx.getImageData(x + bit, y, 1, 1).data;
-                        // If pixel is dark, set bit to 0 (for e-paper)
-                        if (imgData[0] < 128) byte |= (1 << (7 - bit));
-                    }
-                    hex += byte.toString(16).padStart(2, '0');
-                }
-            }
-            return hex;
-        }
-
-        // --- BLE CORE (SAME AS BEFORE) ---
-        function sendimg(cmdIMG) {
-            startTime = new Date().getTime();
-            imgArray = cmdIMG;
-            uploadPart = 0;
-            addLog('Sending Page...');
-            sendCommand(hexToBytes("0000")).then(() => {
-                sendCommand(hexToBytes("020000")).then(() => sendIMGpart());
-            }).catch(handleError);
-        }
-
-        function sendIMGpart() {
-            if (imgArray.length > 0) {
-                let currentpart = "03" + imgArray.substring(0, 480);
-                imgArray = imgArray.substring(480);
-                setStatus('SENDING: ' + (uploadPart++) + "%");
-                sendCommand(hexToBytes(currentpart)).then(() => sendIMGpart()).catch(handleError);
-            } else {
-                sendCommand(hexToBytes("01")).then(() => {
-                    setStatus("PAGE SENT!");
-                    addLog("Done.");
+        async function connect() {
+            try {
+                const device = await navigator.bluetooth.requestDevice({
+                    filters: [{ namePrefix: 'ATC' }],
+                    optionalServices: [SERVICE_UUID]
                 });
-            }
-        }
-
-        function preConnect() {
-            navigator.bluetooth.requestDevice({ 
-                optionalServices: ['13187b10-eba9-a3ba-044e-83d3217d9a38'], 
-                acceptAllDevices: true 
-            }).then(device => {
-                bleDevice = device;
                 addLog("Connecting...");
-                return device.gatt.connect();
-            }).then(server => {
-                return server.getPrimaryService('13187b10-eba9-a3ba-044e-83d3217d9a38');
-            }).then(service => {
-                return service.getCharacteristic('4b646063-6264-f3a7-8941-e65356ea82fe');
-            }).then(characteristic => {
-                writeCharacteristic = characteristic;
-                document.getElementById("connectbutton").innerHTML = "PAGER ONLINE";
-                setStatus("CONNECTED");
-            }).catch(err => addLog(err));
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                writeChar = await service.getCharacteristic(CHAR_UUID);
+                addLog("PAGER ONLINE");
+                document.getElementById('connBtn').innerText = "ONLINE";
+            } catch (e) { addLog("Error: " + e.message); }
         }
 
-        async function sendCommand(cmd) { if (writeCharacteristic) await writeCharacteristic.writeValue(cmd); }
-        function setStatus(txt) { document.getElementById("status").innerHTML = txt; }
-        function addLog(txt) { document.getElementById("log").innerHTML = txt; }
+        async function generateAndSend() {
+            if (!writeChar) return addLog("CONNECT FIRST!");
+            
+            const canvas = document.getElementById('engine');
+            const ctx = canvas.getContext('2d');
+            const text = document.getElementById('msgInput').value;
+
+            // Draw: Black Background, White Text (This often works better for inversion issues)
+            ctx.fillStyle = "black"; 
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "white";
+            ctx.font = "bold 40px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText(text, canvas.width/2, canvas.height/2 + 15);
+
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+            let hexString = "";
+            
+            // Core Logic: We are packing 8 pixels into 1 byte
+            for (let i = 0; i < imgData.length; i += 4 * 8) {
+                let byte = 0;
+                for (let bit = 0; bit < 8; bit++) {
+                    // INVERSION LOGIC: If pixel is bright (>128), set the bit
+                    if (imgData[(i + bit * 4)] > 128) {
+                        byte |= (1 << (7 - bit));
+                    }
+                }
+                hexString += byte.toString(16).padStart(2, '0');
+            }
+
+            try {
+                addLog("Waking tag...");
+                await writeChar.writeValue(new Uint8Array([0x00, 0x00])); 
+                await writeChar.writeValue(new Uint8Array([0x02, 0x00, 0x00])); 
+
+                const step = 480; 
+                for (let i = 0; i < hexString.length; i += step) {
+                    // Header: 03 (Data) + 01 (Buffer Type) + Address (2 bytes)
+                    let part = "0301" + intToHex16(i/2) + hexString.substring(i, i + step);
+                    await writeChar.writeValue(hexToBytes(part));
+                    addLog("Paging... " + Math.round((i/hexString.length)*100) + "%");
+                }
+
+                addLog("Finalizing...");
+                // Refresh command 0101 triggers the hardware
+                await writeChar.writeValue(new Uint8Array([0x01, 0x01])); 
+                addLog("MESSAGE SENT");
+            } catch (e) { addLog("Pager Error: " + e.message); }
+        }
+
+        function intToHex16(val) {
+            let h = val.toString(16).padStart(4, '0');
+            return h.substring(2,4) + h.substring(0,2); // Little Endian
+        }
+
         function hexToBytes(hex) {
             let bytes = [];
             for (let c = 0; c < hex.length; c += 2) bytes.push(parseInt(hex.substr(c, 2), 16));
             return new Uint8Array(bytes);
         }
-        function handleError(e) { console.log(e); setStatus("ERROR"); }
     </script>
 </body>
+
 </html>
