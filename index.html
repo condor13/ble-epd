@@ -91,43 +91,58 @@
             const ctx = canvas.getContext('2d');
             const text = document.getElementById('msgInput').value;
 
-            // 1. Draw Text to Canvas
-            ctx.fillStyle = "white";
+            // Draw: Black Background, White Text (This often works better for inversion issues)
+            ctx.fillStyle = "black"; 
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = "black";
-            ctx.font = "bold 35px Arial";
+            ctx.fillStyle = "white";
+            ctx.font = "bold 40px Arial";
             ctx.textAlign = "center";
-            ctx.fillText(text, canvas.width/2, canvas.height/2 + 10);
+            ctx.fillText(text, canvas.width/2, canvas.height/2 + 15);
 
-            // 2. Convert Canvas to E-Paper Hex format
             const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
             let hexString = "";
             
+            // Core Logic: We are packing 8 pixels into 1 byte
             for (let i = 0; i < imgData.length; i += 4 * 8) {
                 let byte = 0;
                 for (let bit = 0; bit < 8; bit++) {
-                    const r = imgData[(i + bit * 4)];
-                    if (r < 128) byte |= (1 << (7 - bit));
+                    // INVERSION LOGIC: If pixel is bright (>128), set the bit
+                    if (imgData[(i + bit * 4)] > 128) {
+                        byte |= (1 << (7 - bit));
+                    }
                 }
                 hexString += byte.toString(16).padStart(2, '0');
             }
 
-            // 3. Send via BLE
-            addLog("Sending Page...");
-            await writeChar.writeValue(new Uint8Array([0x00, 0x00])); // Reset
-            await writeChar.writeValue(new Uint8Array([0x02, 0x00, 0x00])); // Prep
+            try {
+                addLog("Waking tag...");
+                await writeChar.writeValue(new Uint8Array([0x00, 0x00])); 
+                await writeChar.writeValue(new Uint8Array([0x02, 0x00, 0x00])); 
 
-            const step = 480;
-            for (let i = 0; i < hexString.length; i += step) {
-                let part = "03" + hexString.substring(i, i + step);
-                let bytes = [];
-                for (let c = 0; c < part.length; c += 2) bytes.push(parseInt(part.substr(c, 2), 16));
-                await writeChar.writeValue(new Uint8Array(bytes));
-                addLog("Transmitting... " + Math.round((i/hexString.length)*100) + "%");
-            }
+                const step = 480; 
+                for (let i = 0; i < hexString.length; i += step) {
+                    // Header: 03 (Data) + 01 (Buffer Type) + Address (2 bytes)
+                    let part = "0301" + intToHex16(i/2) + hexString.substring(i, i + step);
+                    await writeChar.writeValue(hexToBytes(part));
+                    addLog("Paging... " + Math.round((i/hexString.length)*100) + "%");
+                }
 
-            await writeChar.writeValue(new Uint8Array([0x01])); // Refresh
-            addLog("PAGE DELIVERED");
+                addLog("Finalizing...");
+                // Refresh command 0101 triggers the hardware
+                await writeChar.writeValue(new Uint8Array([0x01, 0x01])); 
+                addLog("MESSAGE SENT");
+            } catch (e) { addLog("Pager Error: " + e.message); }
+        }
+
+        function intToHex16(val) {
+            let h = val.toString(16).padStart(4, '0');
+            return h.substring(2,4) + h.substring(0,2); // Little Endian
+        }
+
+        function hexToBytes(hex) {
+            let bytes = [];
+            for (let c = 0; c < hex.length; c += 2) bytes.push(parseInt(hex.substr(c, 2), 16));
+            return new Uint8Array(bytes);
         }
     </script>
 </body>
