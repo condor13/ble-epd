@@ -2,64 +2,128 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>S24 BLE Pager</title>
+    <title>S24 Pager - Root Path</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    
     <script src="dithering.js"></script>
     <script src="utils.js"></script>
+
     <style>
-        body { font-family: system-ui, sans-serif; background: #1a1a1a; color: white; text-align: center; padding: 20px; }
-        #canvas { background: white; border: 2px solid #555; border-radius: 4px; margin-bottom: 20px; max-width: 100%; }
-        input { width: 90%; padding: 15px; font-size: 1.2rem; border-radius: 8px; border: 1px solid #444; background: #2a2a2a; color: white; margin-bottom: 15px; }
-        button { padding: 15px 30px; font-size: 1rem; font-weight: bold; border-radius: 8px; border: none; cursor: pointer; width: 90%; margin: 5px; }
-        .btn-conn { background: #4a4a4a; color: white; }
-        .btn-send { background: #0084ff; color: white; }
-        #log { font-family: monospace; font-size: 0.75rem; color: #aaa; margin-top: 20px; height: 120px; overflow-y: auto; text-align: left; background: #000; padding: 10px; border-radius: 4px; }
+        body { font-family: -apple-system, sans-serif; background: #121212; color: #fff; text-align: center; padding: 20px; }
+        canvas { background: white; border: 3px solid #444; border-radius: 8px; margin-bottom: 15px; width: 100%; max-width: 296px; height: auto; image-rendering: pixelated; }
+        input { width: 90%; padding: 15px; font-size: 1.2rem; border-radius: 10px; border: 1px solid #333; background: #222; color: #fff; margin-bottom: 10px; outline: none; }
+        button { width: 95%; padding: 16px; margin: 6px 0; font-weight: bold; border-radius: 10px; border: none; cursor: pointer; transition: 0.2s; }
+        .btn-conn { background: #333; color: #00d4ff; border: 1px solid #00d4ff; }
+        .btn-send { background: #0084ff; color: white; box-shadow: 0 4px 15px rgba(0, 132, 255, 0.3); }
+        #log { background: #000; color: #00ff00; font-family: 'Courier New', monospace; font-size: 12px; padding: 12px; text-align: left; height: 140px; overflow-y: auto; border-radius: 8px; margin-top: 15px; border: 1px solid #222; }
     </style>
 </head>
 <body>
 
-    <h2>📟 S24 PAGER</h2>
+    <h2>📟 S24 BLE PAGER</h2>
     
     <canvas id="canvas" width="296" height="128"></canvas>
     
-    <input type="text" id="msgInput" placeholder="Enter message here..." oninput="drawText()">
+    <input type="text" id="msgInput" placeholder="Type your message..." oninput="drawText()">
     
-    <button class="btn-conn" id="connBtn" onclick="preConnect()">1. SEARCH & CONNECT</button>
+    <button class="btn-conn" id="connBtn" onclick="preConnect()">1. SEARCH ALL DEVICES</button>
     <button class="btn-send" onclick="upload_image()">2. PUSH TO SCREEN</button>
 
-    <div id="log">Status: Ready</div>
+    <div id="log">System: Ready</div>
 
     <script>
         let bleDevice, gattServer, epdService, epdCharacteristic;
         const SERVICE_UUID = '13187b10-eba9-a3ba-044e-83d3217d9a38';
         const CHAR_UUID = '4b646063-6264-f3a7-8941-e65356ea82fe';
 
-        function addLog(msg) {
-            const log = document.getElementById('log');
-            log.innerHTML += `> ${msg}<br>`;
-            log.scrollTop = log.scrollHeight;
+        function addLog(m) {
+            const l = document.getElementById('log');
+            l.innerHTML += `> ${m}<br>`;
+            l.scrollTop = l.scrollHeight;
         }
 
         function drawText() {
-            const canvas = document.getElementById('canvas');
-            const ctx = canvas.getContext('2d');
-            const text = document.getElementById('msgInput').value || "S24 READY";
+            const c = document.getElementById('canvas');
+            const ctx = c.getContext('2d');
+            const val = document.getElementById('msgInput').value || "S24 ONLINE";
+            
             ctx.fillStyle = "white";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillRect(0, 0, c.width, c.height);
+            
             ctx.fillStyle = "black";
-            ctx.font = "bold 36px Arial";
+            ctx.font = "bold 38px Arial";
             ctx.textAlign = "center";
-            ctx.fillText(text, canvas.width / 2, canvas.height / 2 + 12);
+            ctx.fillText(val, c.width/2, c.height/2 + 14);
         }
 
         async function preConnect() {
             try {
-                addLog("Requesting all devices...");
-                // FILTER REMOVED: Shows everything
+                addLog("Scanning for all BLE devices...");
                 bleDevice = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
-                    optionalServices: [SERVICE_UUID, '00001f10-0000-1000-8000-00805f9b34fb']
+                    optionalServices: [SERVICE_UUID]
                 });
 
-                addLog("Connecting to: " +
+                addLog("Connecting to: " + (bleDevice.name || "Unknown Device"));
+                gattServer = await bleDevice.gatt.connect();
+                epdService = await gattServer.getPrimaryService(SERVICE_UUID);
+                epdCharacteristic = await epdService.getCharacteristic(CHAR_UUID);
+                
+                document.getElementById('connBtn').innerText = "ONLINE: " + (bleDevice.name || "S24");
+                document.getElementById('connBtn').style.borderColor = "#00ff00";
+                addLog("Handshake complete.");
+            } catch (e) {
+                addLog("Connection Failed: " + e.message);
+            }
+        }
 
+        async function sendCommand(cmd) {
+            if (epdCharacteristic) {
+                // hexToBytes comes from utils.js
+                await epdCharacteristic.writeValueWithResponse(hexToBytes(cmd));
+            }
+        }
+
+        async function sendBufferData(value, type) {
+            let code = (type === 'bwr') ? '00' : 'ff';
+            const step = 480;
+            for (let i = 0; i < value.length; i += step) {
+                // intToHex comes from utils.js
+                await sendCommand("03" + code + intToHex(i / 2, 2) + value.substring(i, i + step));
+            }
+        }
+
+        async function upload_image() {
+            if (!epdCharacteristic) return addLog("Please connect first!");
+            
+            const canvas = document.getElementById('canvas');
+            const startTime = Date.now();
+            
+            try {
+                addLog("Waking tag...");
+                await sendCommand("0000"); 
+                await sendCommand("020000"); 
+
+                addLog("Sending Black/White buffer...");
+                // canvas2bytes and bytesToHex come from utils.js
+                const bwData = bytesToHex(canvas2bytes(canvas));
+                await sendBufferData(bwData, 'bw');
+                
+                addLog("Sending Red/Blank buffer...");
+                const redData = bytesToHex(canvas2bytes(canvas, 'bwr'));
+                await sendBufferData(redData, 'bwr');
+
+                addLog("Triggering Refresh...");
+                await sendCommand("0101");
+                
+                addLog(`Success! (${(Date.now() - startTime) / 1000}s)`);
+            } catch (e) {
+                addLog("Upload Error: " + e.message);
+            }
+        }
+
+        // Initial Canvas Draw
+        drawText();
+    </script>
+</body>
+</html>
