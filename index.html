@@ -2,134 +2,68 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>S24 Pager Dashboard</title>
+    <title>S24 Custom Pager</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    
     <script src="dithering.js"></script>
     <script src="utils.js"></script>
-
     <style>
-        /* Modern Dark Theme with Radial Gradient */
         body { 
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+            font-family: 'Segoe UI', system-ui, sans-serif; 
             background: radial-gradient(circle at center, #2c2c2e 0%, #1a1a1b 100%);
-            color: #e0e0e0; 
-            margin: 0; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: flex-start;
-            min-height: 100vh;
-            padding: 20px;
+            color: #e0e0e0; margin: 0; display: flex; flex-direction: column; 
+            align-items: center; min-height: 100vh; padding: 20px;
         }
-
-        /* Centered App Container */
-        .app-container {
-            width: 100%;
-            max-width: 420px; 
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            margin-top: 20px;
-        }
-
-        /* Header Row: Title + Gear */
-        .header-row {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-            margin-bottom: 5px;
-        }
-
-        h2 { 
-            color: #00d4ff; 
-            font-weight: 300; 
-            margin: 0; 
-            letter-spacing: 2px;
-            text-shadow: 0 2px 10px rgba(0,212,255,0.2);
-        }
-
+        .app-container { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 15px; margin-top: 10px; }
+        .header-row { display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 5px; }
+        h2 { color: #00d4ff; font-weight: 300; margin: 0; letter-spacing: 2px; }
+        
         .settings-btn-inline { 
-            background: #2d2d2e; 
-            border: 1px solid #444;
-            border-radius: 8px; 
-            width: 36px; height: 36px; cursor: pointer; 
-            display: flex; align-items: center; justify-content: center; 
-            font-size: 18px; color: #aaa;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            transition: 0.2s;
-        }
-        .settings-btn-inline:hover { 
-            background: #444; 
-            color: #fff;
-            transform: rotate(45deg); 
+            background: #2d2d2e; border: 1px solid #444; border-radius: 8px; 
+            width: 36px; height: 36px; cursor: pointer; display: flex; 
+            align-items: center; justify-content: center; font-size: 18px; color: #aaa;
         }
 
-        /* Preview Canvas */
         canvas { 
-            background: white; 
-            border: 4px solid #333; 
-            border-radius: 12px; 
-            box-shadow: 0 20px 40px rgba(0,0,0,0.6); 
-            width: 100%; 
-            height: auto; 
+            background: white; border: 4px solid #333; border-radius: 12px; 
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6); width: 100%; height: auto; 
             image-rendering: pixelated; 
         }
 
-        /* Progress Bar */
-        #progressContainer { 
-            width: 100%; background: #333; height: 10px; 
-            border-radius: 5px; overflow: hidden; display: none; 
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
-        }
-        #progressBar { 
-            width: 0%; height: 100%; 
-            background: linear-gradient(90deg, #00d4ff, #0084ff); 
-            transition: width 0.2s; 
-        }
+        #progressContainer { width: 100%; background: #333; height: 10px; border-radius: 5px; overflow: hidden; display: none; }
+        #progressBar { width: 0%; height: 100%; background: linear-gradient(90deg, #00d4ff, #0084ff); transition: width 0.2s; }
 
-        /* Message Input */
         textarea { 
-            width: 100%; height: 110px; padding: 15px; 
-            font-size: 1.1rem; border-radius: 14px; border: 1px solid #3d3d3f; 
-            background: #2d2d2e; color: white; outline: none; resize: none;
-            box-sizing: border-box;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            width: 100%; height: 100px; padding: 15px; font-size: 1.1rem; 
+            border-radius: 14px; border: 1px solid #3d3d3f; background: #2d2d2e; 
+            color: white; outline: none; resize: none; box-sizing: border-box;
         }
-        textarea:focus { border-color: #00d4ff; }
 
-        /* The Main Action Button */
+        .action-row { display: flex; gap: 10px; width: 100%; }
         .main-btn { 
-            width: 100%; padding: 22px; font-weight: bold; 
-            border-radius: 16px; border: none; cursor: pointer; 
-            font-size: 1.2rem; transition: 0.3s; 
-            background: #007bff; color: white; 
-            box-shadow: 0 8px 20px rgba(0, 123, 255, 0.3);
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            flex: 1; padding: 20px; font-weight: bold; border-radius: 16px; 
+            border: none; cursor: pointer; font-size: 1.1rem; transition: 0.3s; 
+            background: #007bff; color: white; text-transform: uppercase;
         }
-        .main-btn.online { 
-            background: #28a745; 
-            box-shadow: 0 8px 20px rgba(40, 167, 69, 0.3); 
+        .main-btn.online { background: #28a745; }
+        
+        .btn-buzz {
+            width: 70px; background: #3c3c3e; border: 1px solid #444;
+            border-radius: 16px; display: flex; align-items: center; 
+            justify-content: center; font-size: 1.5rem; cursor: pointer; transition: 0.2s;
         }
-        .main-btn:active { transform: scale(0.97); }
 
-        /* Status Log */
         #log { 
-            background: rgba(0,0,0,0.8); color: #00ff00; font-family: 'Courier New', monospace; 
-            font-size: 11px; padding: 12px; text-align: left; 
-            height: 90px; overflow-y: auto; border-radius: 10px; 
-            border: 1px solid #333; width: 100%; box-sizing: border-box;
+            background: rgba(0,0,0,0.8); color: #00ff00; font-family: monospace; 
+            font-size: 11px; padding: 12px; text-align: left; height: 70px; 
+            overflow-y: auto; border-radius: 10px; border: 1px solid #333; width: 100%; box-sizing: border-box;
         }
     </style>
 </head>
-
 <body>
     <div class="app-container">
         <div class="header-row">
             <h2>S24 PAGER</h2>
-            <div class="settings-btn-inline" onclick="disconnectDevice()" title="Switch Device">⚙️</div>
+            <div class="settings-btn-inline" onclick="disconnectDevice()">⚙️</div>
         </div>
         
         <canvas id="canvas" width="296" height="128"></canvas>
@@ -138,17 +72,28 @@
             <div id="progressBar"></div>
         </div>
         
-        <textarea id="msgInput" placeholder="Enter message..." oninput="drawText()"></textarea>
+        <textarea id="msgInput" placeholder="Message..." oninput="drawText()"></textarea>
         
-        <button class="main-btn" id="actionBtn" onclick="handleAction()">Connect Pager</button>
+        <div class="action-row">
+            <button class="main-btn" id="actionBtn" onclick="handleAction()">Connect Pager</button>
+            <div class="btn-buzz" onclick="vibrateTag()" title="Vibrate Motor">📳</div>
+        </div>
 
         <div id="log">System: Ready</div>
     </div>
 
     <script>
-        let bleDevice, gattServer, epdService, epdCharacteristic;
+        let bleDevice, epdCharacteristic;
         const SERVICE_UUID = '13187b10-eba9-a3ba-044e-83d3217d9a38';
         const CHAR_UUID = '4b646063-6264-f3a7-8941-e65356ea82fe';
+        
+        // 1. Pre-load the graphic correctly
+        const sideImg = new Image();
+        sideImg.src = '02.bmp'; 
+        sideImg.onload = () => {
+            console.log("Graphic loaded");
+            drawText();
+        };
 
         function addLog(m) {
             const l = document.getElementById('log');
@@ -159,24 +104,36 @@
         function drawText() {
             const c = document.getElementById('canvas');
             const ctx = c.getContext('2d');
-            const input = document.getElementById('msgInput').value || "S24 PAGER READY";
+            const input = document.getElementById('msgInput').value || "S24 READY";
             
+            // Clear to White
             ctx.fillStyle = "white";
             ctx.fillRect(0, 0, c.width, c.height);
             
-            // Envelope Icon (Top Right)
+            // 2. Draw Graphic 02.bmp (Persistent on left)
+            if (sideImg.complete && sideImg.naturalWidth !== 0) {
+                // We lock height to 100px to keep it clean on the 128px screen
+                const h = 100; 
+                const w = (sideImg.width / sideImg.height) * h;
+                ctx.drawImage(sideImg, 10, (c.height - h) / 2, w, h);
+            }
+
+            // 3. Envelope Icon
             const iconX = c.width - 35, iconY = 12;
             ctx.strokeStyle = "black"; ctx.lineWidth = 2;
             ctx.strokeRect(iconX, iconY, 22, 14); 
             ctx.beginPath(); ctx.moveTo(iconX, iconY); ctx.lineTo(iconX + 11, iconY + 7); ctx.lineTo(iconX + 22, iconY); ctx.stroke();
 
-            // Text Rendering Settings
-            const fontSize = 26, xOffset = 10;
+            // 4. Text Rendering (Centered in the remaining space)
+            const fontSize = 24;
+            // The graphic takes up ~80-100px, so we center text in the right half
+            const xCenter = 180; 
             ctx.fillStyle = "black";
             ctx.font = `bold ${fontSize}px Arial`;
             ctx.textAlign = "center"; ctx.textBaseline = "middle";
 
-            const maxWidth = c.width - 50, lineHeight = fontSize + 4;
+            const maxWidth = 180; // Bound the text so it doesn't hit the character
+            const lineHeight = fontSize + 4;
             const inputLines = input.split('\n');
             let lines = [];
             
@@ -194,69 +151,52 @@
             const totalHeight = lines.length * lineHeight;
             let startY = (c.height - totalHeight) / 2 + (lineHeight / 2);
             lines.forEach((line, i) => {
-                ctx.fillText(line.trim(), (c.width / 2) + xOffset, startY + (i * lineHeight));
+                ctx.fillText(line.trim(), xCenter, startY + (i * lineHeight));
             });
         }
 
         async function handleAction() {
             if (!bleDevice || !bleDevice.gatt.connected) {
-                await connectPager();
+                try {
+                    addLog("Scanning...");
+                    bleDevice = await navigator.bluetooth.requestDevice({
+                        filters: [{ namePrefix: 'S24_' }],
+                        optionalServices: [SERVICE_UUID]
+                    });
+                    const server = await bleDevice.gatt.connect();
+                    const service = await server.getPrimaryService(SERVICE_UUID);
+                    epdCharacteristic = await service.getCharacteristic(CHAR_UUID);
+                    
+                    document.getElementById('actionBtn').innerText = "Send to Pager";
+                    document.getElementById('actionBtn').classList.add('online');
+                    addLog("Connected: " + bleDevice.name);
+                } catch (e) { addLog("Error: " + e.message); }
             } else {
                 await upload_image();
             }
         }
 
-        async function connectPager() {
-            try {
-                addLog("Filtering for S24_...");
-                bleDevice = await navigator.bluetooth.requestDevice({
-                    filters: [{ namePrefix: 'S24_' }],
-                    optionalServices: [SERVICE_UUID]
-                });
-                addLog("Connecting...");
-                gattServer = await bleDevice.gatt.connect();
-                epdService = await gattServer.getPrimaryService(SERVICE_UUID);
-                epdCharacteristic = await epdService.getCharacteristic(CHAR_UUID);
-                
-                const btn = document.getElementById('actionBtn');
-                btn.innerText = "Send to Pager";
-                btn.classList.add('online');
-                addLog("Connected: " + bleDevice.name);
-
-                bleDevice.addEventListener('gattserverdisconnected', () => {
-                    btn.innerText = "Reconnect Pager";
-                    btn.classList.remove('online');
-                    addLog("Link Lost.");
-                });
-            } catch (e) { addLog("Error: " + e.message); }
-        }
-
-        async function disconnectDevice() {
-            if (bleDevice) await bleDevice.gatt.disconnect();
-            addLog("Switching device...");
-            await connectPager();
-        }
-
         async function upload_image() {
             const canvas = document.getElementById('canvas');
-            const bar = document.getElementById('progressBar');
-            document.getElementById('progressContainer').style.display = 'block';
+            // Re-draw one last time to be safe
+            drawText();
             
+            document.getElementById('progressContainer').style.display = 'block';
             try {
-                addLog("Syncing...");
+                addLog("Sending image data...");
                 await epdCharacteristic.writeValueWithResponse(hexToBytes("0000")); 
                 await epdCharacteristic.writeValueWithResponse(hexToBytes("020000")); 
-
+                
                 const bwData = bytesToHex(canvas2bytes(canvas));
                 await sendChunked(bwData, 'ff', 0);
                 
                 const redData = bytesToHex(canvas2bytes(canvas, 'bwr'));
                 await sendChunked(redData, '00', 50);
-
+                
                 await epdCharacteristic.writeValueWithResponse(hexToBytes("0101"));
-                addLog("Update Sent!");
+                addLog("Updated Display.");
                 setTimeout(() => { document.getElementById('progressContainer').style.display = 'none'; }, 2000);
-            } catch (e) { addLog("Upload failed: " + e.message); }
+            } catch (e) { addLog("Fail: " + e.message); }
         }
 
         async function sendChunked(value, code, base) {
@@ -268,7 +208,19 @@
             }
         }
 
-        drawText();
+        async function vibrateTag() {
+            if (!epdCharacteristic) return addLog("Connect first!");
+            try {
+                await epdCharacteristic.writeValueWithResponse(hexToBytes("0401"));
+                addLog("Buzz command sent.");
+            } catch (e) { addLog("Vibrate failed."); }
+        }
+
+        async function disconnectDevice() {
+            if (bleDevice) await bleDevice.gatt.disconnect();
+            addLog("Reset.");
+            handleAction();
+        }
     </script>
 </body>
 </html>
